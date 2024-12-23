@@ -2,7 +2,8 @@ package utils
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io"
 	"net/http"
 )
 
@@ -12,9 +13,30 @@ func WriteJSON(w http.ResponseWriter, status int, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
 
-func ParseJSON(r *http.Request, v any) error {
-	if r.Body != nil {
-		fmt.Println("Empty body for request")
+func ParseBody(message interface{}, v any) error {
+	var body io.ReadCloser
+
+	switch m := message.(type) {
+
+	case *http.Request:
+		if m.Body == nil {
+			return errors.New("empty request body")
+		}
+		body = m.Body
+
+	case *http.Response:
+		if m.Body == nil {
+			return errors.New("empty response body")
+		}
+		body = m.Body
+
+	default:
+		return errors.New("neither response nor request")
 	}
-	return json.NewDecoder(r.Body).Decode(v)
+
+	defer body.Close()
+	if err := json.NewDecoder(body).Decode(v); err != nil {
+		return errors.New("couldn't parse body")
+	}
+	return nil
 }

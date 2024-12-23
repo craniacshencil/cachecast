@@ -9,9 +9,28 @@
 
 <body>
   <h1>Cachecast</h1>
-  <label>Enter city name:
-    <input type="text" />
-  </label>
+  <form method="post">
+    <label>Enter location:
+      <input type="text" name="location" required />
+    </label>
+    <br />
+    <label>Enter date:
+      <input type="date" name="start-date" />
+    </label>
+    <br />
+    <fieldset>
+      <legend>For a timeframe</legend>
+      <label>Enter date:
+        <input type="date" name="start-date" />
+      </label>
+      <br />
+      <label>Enter date(for timeframes):
+        <input type="date" name="end-date" />
+      </label>
+    </fieldset>
+    <br />
+    <button>submit</button>
+  </form>
 </body>
 
 </html>

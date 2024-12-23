@@ -35,7 +35,7 @@ func main() {
 			return
 		}
 	})
-	router.HandleFunc("POST /getWeather", internal.GetWeather)
+	router.HandleFunc("POST /", internal.GetWeather)
 
 	server := &http.Server{
 		Addr:    os.Getenv("SERVER_ADDR"),
