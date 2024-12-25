@@ -11,7 +11,7 @@ import (
 
 func OnlyLocation(w http.ResponseWriter, location string) {
 	apiEndpoint := fmt.Sprintf(
-		"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s?key=%s&unitGroup=metric",
+		"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s?key=%s&unitGroup=metric&elements=temp,tempmin,tempmax,conditions,datetime&include=days",
 		location,
 		os.Getenv("API_KEY"),
 	)

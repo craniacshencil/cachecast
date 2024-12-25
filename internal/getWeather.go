@@ -22,6 +22,24 @@ func GetWeather(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Error if user only fills time-field and not date
+	if onlyDate == "" && onlyTime != "" {
+		log.Println("ERR: No date entered, only time entered")
+		utils.WriteJSON(w, 404, "no date entered")
+		return
+	}
+
+	// Error if user tries to hit both timeframe and daily weather updates
+	if onlyDate != "" && (endDate != "" || startDate != "") {
+		log.Println("ERR: You can get only one weather update at a time")
+		utils.WriteJSON(
+			w,
+			404,
+			"you are trying both daily and timeframe weather updates. Choose one",
+		)
+		return
+	}
+
 	// Errors if one of start-date or end-date is not entered
 	if startDate == "" && endDate != "" {
 		log.Println("ERR: No start-date entered, only end-date entered")
