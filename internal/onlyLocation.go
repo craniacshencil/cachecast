@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,71 +13,97 @@ import (
 )
 
 func (c *CacheClient) OnlyLocation(w http.ResponseWriter, location string) {
-	start := time.Now()
 	var response utils.JSONWrapper
-
-	// Check in cache first
+	start := time.Now()
 	ctx := context.Background()
-	getTransaction := c.rdsClient.Get(ctx, location)
-	if getTransaction.Err() != nil {
-		log.Println("cache miss")
+	// Add contexts with timeout and change fetchAPI code later
+
+	err := c.searchCache(ctx, location, &response)
+	if err != nil {
+		log.Println(err.Error())
 	} else {
-		log.Println("cache hit")
-		binaryRedisHit, err := getTransaction.Bytes()
-		if err != nil {
-			log.Println("ERR: While converting cache-hit value to bytes")
-			log.Println(err)
-			// Find a way to break out of here to contact API or give error here?? idk
-		}
-		err = response.UnmarshalBinary(binaryRedisHit)
-		if err != nil {
-			log.Println("ERR: While unmarshalling bytes from cache-hit")
-			log.Println(err)
-			// Find a way to break out of here to contact API or give error here?? idk
-		}
-		log.Printf("Exec: %s", time.Since(start))
-		utils.WriteJSON(w, 200, response.Data)
+		log.Printf("cache-hit: %s", time.Since(start))
+		utils.WriteJSON(w, http.StatusOK, &response.Data)
 		return
 	}
 
-	// GET endpoint and store data
+	statusCode, err := fetchlocationAPI(location, &response)
+	if err != nil {
+		utils.WriteJSON(w, statusCode, err.Error())
+		return
+	}
+	utils.WriteJSON(w, statusCode, &response.Data)
+	log.Printf("Exec: %s", time.Since(start))
+
+	go func() {
+		if err = c.storeInCache(ctx, location, &response); err != nil {
+			log.Println(err)
+		}
+	}()
+}
+
+func (c *CacheClient) searchCache(
+	ctx context.Context,
+	location string,
+	response *utils.JSONWrapper,
+) (err error) {
+	getTransaction := c.rdsClient.Get(ctx, location)
+	if getTransaction.Err() != nil {
+		return errors.New("cache-miss")
+	}
+
+	binaryRedisHit, err := getTransaction.Bytes()
+	if err != nil {
+		return errors.Join(err, errors.New("while converting cache-hit values to bytes"))
+	}
+
+	err = response.UnmarshalBinary(binaryRedisHit)
+	if err != nil {
+		return errors.Join(err, errors.New("while unmarshalling bytes from cache-hit"))
+	}
+	return nil
+}
+
+func fetchlocationAPI(
+	location string,
+	response *utils.JSONWrapper,
+) (status int, err error) {
 	apiEndpoint := fmt.Sprintf(
 		"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s?key=%s&unitGroup=metric&elements=temp,tempmin,tempmax,conditions,datetime&include=days",
 		location,
 		os.Getenv("API_KEY"),
 	)
+
 	res, err := http.Get(apiEndpoint)
 	if err != nil {
-		log.Println("ERR: While contacting third party api")
-		log.Println(err)
-		utils.WriteJSON(w, http.StatusNotFound, err)
-		return
+		err = errors.Join(err, errors.New("while contacting third party api"))
+		return http.StatusNotFound, err
 	}
 	utils.ParseBody(res, &response.Data)
 
 	if response.Data == nil {
-		log.Println("ERR: Invalid location")
-		utils.WriteJSON(w, http.StatusNotFound, "invalid location, check for errors")
-		return
+		err = errors.Join(err, errors.New("invalid location, check for errors"))
+		return http.StatusNotFound, err
 	}
 
+	return 200, nil
+}
+
+func (c *CacheClient) storeInCache(
+	ctx context.Context,
+	location string,
+	response *utils.JSONWrapper,
+) (err error) {
 	resBytes, err := response.MarshalBinary()
 	if err != nil {
-		log.Println("ERR: While serializing response for redis")
-		log.Println(err)
-		// Sending error doesn't make sense if caching does not work
-		// App will still work using thirdparty APIs
-	} else {
-		// If data has been converted to byte array
-		transactionStatus := c.rdsClient.Set(ctx, location, resBytes, time.Hour)
-		if transactionStatus.Err() != nil {
-			log.Println("ERR: While caching")
-			log.Println(err)
-			// Again failing to cache shouldn't stop flow
-			// So no return
-		}
+		return errors.Join(errors.New("while serializing response for redis"), err)
 	}
-
-	log.Printf("Exec: %s", time.Since(start))
-	utils.WriteJSON(w, 200, response.Data)
+	transactionStatus := c.rdsClient.Set(ctx, location, resBytes, time.Hour)
+	if transactionStatus.Err() != nil {
+		return errors.Join(
+			errors.New("while storing response in redis"),
+			transactionStatus.Err(),
+		)
+	}
+	return nil
 }
