@@ -8,6 +8,7 @@ import (
 
 	"github.com/craniacshencil/cachecast/internal"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 func init() {
@@ -19,6 +20,15 @@ func init() {
 }
 
 func main() {
+	client := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDR"),
+		Password: "",
+		DB:       1,
+		Protocol: 2,
+	})
+
+	cacheClient := internal.NewCacheClient(client)
+
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		t, err := template.ParseFiles("./web/index.html")
@@ -35,7 +45,7 @@ func main() {
 			return
 		}
 	})
-	router.HandleFunc("POST /", internal.GetWeather)
+	router.HandleFunc("POST /", cacheClient.GetWeather)
 
 	server := &http.Server{
 		Addr:    os.Getenv("SERVER_ADDR"),

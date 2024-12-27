@@ -11,7 +11,7 @@ import (
 	"github.com/craniacshencil/cachecast/utils"
 )
 
-func LocationAndTimeframe(
+func (c *CacheClient) LocationAndTimeframe(
 	w http.ResponseWriter,
 	location string,
 	startDateString string,

@@ -5,9 +5,18 @@ import (
 	"net/http"
 
 	"github.com/craniacshencil/cachecast/utils"
+	"github.com/redis/go-redis/v9"
 )
 
-func GetWeather(w http.ResponseWriter, r *http.Request) {
+type CacheClient struct {
+	rdsClient *redis.Client
+}
+
+func NewCacheClient(client *redis.Client) *CacheClient {
+	return &CacheClient{rdsClient: client}
+}
+
+func (c *CacheClient) GetWeather(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	location := r.FormValue("location")
 	onlyDate := r.FormValue("only-date")
@@ -53,11 +62,11 @@ func GetWeather(w http.ResponseWriter, r *http.Request) {
 
 	// Handling the three cases
 	if startDate != "" && endDate != "" {
-		LocationAndTimeframe(w, location, startDate, endDate)
+		c.LocationAndTimeframe(w, location, startDate, endDate)
 	} else if onlyDate != "" {
 		// Case for when location and date1 is given
-		LocationAndDay(w, location, onlyDate, onlyTime)
+		c.LocationAndDay(w, location, onlyDate, onlyTime)
 	} else {
-		OnlyLocation(w, location)
+		c.OnlyLocation(w, location)
 	}
 }

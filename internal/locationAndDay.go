@@ -10,7 +10,12 @@ import (
 	"github.com/craniacshencil/cachecast/utils"
 )
 
-func LocationAndDay(w http.ResponseWriter, location string, dateString string, timeString string) {
+func (c *CacheClient) LocationAndDay(
+	w http.ResponseWriter,
+	location string,
+	dateString string,
+	timeString string,
+) {
 	var apiEndpoint string
 	var err error
 
