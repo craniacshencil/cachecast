@@ -39,10 +39,10 @@ func (m *JSONWrapper) UnmarshalBinary(data []byte) (err error) {
 
 func (c *CacheClient) searchCache(
 	ctx context.Context,
-	location string,
+	cacheKey string,
 	response *JSONWrapper,
 ) (err error) {
-	getTransaction := c.rdsClient.Get(ctx, location)
+	getTransaction := c.rdsClient.Get(ctx, cacheKey)
 	if getTransaction.Err() != nil {
 		return errors.New("cache-miss")
 	}
@@ -61,14 +61,14 @@ func (c *CacheClient) searchCache(
 
 func (c *CacheClient) storeInCache(
 	ctx context.Context,
-	location string,
+	cacheKey string,
 	response *JSONWrapper,
 ) (err error) {
 	resBytes, err := response.MarshalBinary()
 	if err != nil {
 		return errors.Join(errors.New("while serializing response for redis"), err)
 	}
-	transactionStatus := c.rdsClient.Set(ctx, location, resBytes, time.Hour)
+	transactionStatus := c.rdsClient.Set(ctx, cacheKey, resBytes, time.Hour)
 	if transactionStatus.Err() != nil {
 		return errors.Join(
 			errors.New("while storing response in redis"),
