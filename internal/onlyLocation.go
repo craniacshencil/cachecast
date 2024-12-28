@@ -13,7 +13,7 @@ import (
 )
 
 func (c *CacheClient) OnlyLocation(w http.ResponseWriter, location string) {
-	var response utils.JSONWrapper
+	var response JSONWrapper
 	start := time.Now()
 	ctx := context.Background()
 	// Add contexts with timeout and change fetchAPI code later
@@ -27,7 +27,7 @@ func (c *CacheClient) OnlyLocation(w http.ResponseWriter, location string) {
 		return
 	}
 
-	statusCode, err := fetchlocationAPI(location, &response)
+	statusCode, err := fetchlocationAPI(ctx, location, &response)
 	if err != nil {
 		utils.WriteJSON(w, statusCode, err.Error())
 		return
@@ -42,68 +42,37 @@ func (c *CacheClient) OnlyLocation(w http.ResponseWriter, location string) {
 	}()
 }
 
-func (c *CacheClient) searchCache(
+func fetchlocationAPI(
 	ctx context.Context,
 	location string,
-	response *utils.JSONWrapper,
-) (err error) {
-	getTransaction := c.rdsClient.Get(ctx, location)
-	if getTransaction.Err() != nil {
-		return errors.New("cache-miss")
-	}
-
-	binaryRedisHit, err := getTransaction.Bytes()
-	if err != nil {
-		return errors.Join(err, errors.New("while converting cache-hit values to bytes"))
-	}
-
-	err = response.UnmarshalBinary(binaryRedisHit)
-	if err != nil {
-		return errors.Join(err, errors.New("while unmarshalling bytes from cache-hit"))
-	}
-	return nil
-}
-
-func fetchlocationAPI(
-	location string,
-	response *utils.JSONWrapper,
+	response *JSONWrapper,
 ) (status int, err error) {
+	timeout, cancel := context.WithTimeout(ctx, time.Second*2)
+	defer cancel()
+
 	apiEndpoint := fmt.Sprintf(
 		"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s?key=%s&unitGroup=metric&elements=temp,tempmin,tempmax,conditions,datetime&include=days",
 		location,
 		os.Getenv("API_KEY"),
 	)
 
-	res, err := http.Get(apiEndpoint)
+	req, err := http.NewRequestWithContext(timeout, http.MethodGet, apiEndpoint, nil)
 	if err != nil {
-		err = errors.Join(err, errors.New("while contacting third party api"))
-		return http.StatusNotFound, err
+		err = errors.Join(err, errors.New("while defining request"))
+		return http.StatusBadRequest, err
 	}
-	utils.ParseBody(res, &response.Data)
 
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		err = errors.Join(err, errors.New("request timed-out"))
+		return http.StatusRequestTimeout, err
+	}
+
+	utils.ParseBody(res, &response.Data)
 	if response.Data == nil {
 		err = errors.Join(err, errors.New("invalid location, check for errors"))
 		return http.StatusNotFound, err
 	}
 
 	return 200, nil
-}
-
-func (c *CacheClient) storeInCache(
-	ctx context.Context,
-	location string,
-	response *utils.JSONWrapper,
-) (err error) {
-	resBytes, err := response.MarshalBinary()
-	if err != nil {
-		return errors.Join(errors.New("while serializing response for redis"), err)
-	}
-	transactionStatus := c.rdsClient.Set(ctx, location, resBytes, time.Hour)
-	if transactionStatus.Err() != nil {
-		return errors.Join(
-			errors.New("while storing response in redis"),
-			transactionStatus.Err(),
-		)
-	}
-	return nil
 }
