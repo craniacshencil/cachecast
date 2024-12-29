@@ -52,6 +52,13 @@ func (c *CacheClient) GetWeather(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJSON(w, statusCode, err.Error())
 		return
 	}
+
+	// Invalid location
+	if response.Data.ResolvedAddress == "" {
+		utils.WriteJSON(w, http.StatusBadRequest, "invalid location")
+		return
+	}
+
 	utils.WriteJSON(w, statusCode, &response.Data)
 	log.Printf("Exec: %s", time.Since(start))
 
@@ -84,7 +91,7 @@ func getApiURL(location, onlyDate, onlyTime, startDate, endDate string) (apiEndp
 	} else if onlyDate != "" {
 		// URL for single day with no time specified
 		apiEndpoint = fmt.Sprintf(
-			"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s/%s?key=%s&unitGroup=metric&elements=temp,tempmin,tempmax,conditions,datetime",
+			"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/%s/%s?key=%s&unitGroup=metric&elements=temp,tempmin,tempmax,conditions,datetime&include=days",
 			location,
 			onlyDate,
 			os.Getenv("API_KEY"),
@@ -134,10 +141,11 @@ func fetchData(
 	}
 
 	utils.ParseBody(res, &response.Data)
-	if response.Data == nil {
+	// parseData(&response.Data)
+	/* if response.Data == nil {
 		err = errors.Join(err, errors.New("invalid location, check for errors"))
 		return http.StatusNotFound, err
-	}
+	} */
 
 	return 200, nil
 }

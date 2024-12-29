@@ -14,7 +14,7 @@ type CacheClient struct {
 }
 
 type JSONWrapper struct {
-	Data interface{}
+	Data Weather
 }
 
 func NewCacheClient(client *redis.Client) *CacheClient {
