@@ -1,5 +1,12 @@
 package internal
 
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"text/template"
+)
+
 type Weather struct {
 	ResolvedAddress   string  `json:"resolvedAddress"`
 	Latitude          float32 `json:"latitude"`
@@ -25,18 +32,49 @@ type Hour struct {
 	Temp       float32 `json:"temp"`
 }
 
-/* func parseHourWeather(weatherData interface{}) (parsedWeather *WeatherForHour, err error) {
-	parsedWeather, ok := weatherData.(*WeatherForHour)
-	if !ok {
-		return nil, errors.New("couldn't assert weather by hour data to struct")
-	}
-	return parsedWeather, nil
+type Cache struct {
+	Cachestatus string
+	Reqtime     string
+}
+type DisplayData struct {
+	WeatherData  Weather
+	CacheData    Cache
+	ErrorMessage string
 }
 
-func parseDayWeather(weatherData interface{}) (parsedWeather *Weather, err error) {
-	parsedWeather, ok := weatherData.(*Weather)
-	if !ok {
-		return nil, errors.New("couldn't assert daily weather data to struct")
+func displayWeather(
+	w http.ResponseWriter,
+	data Weather,
+	cacheStatus string,
+	reqtime string,
+	onlyErrorMessage error,
+	statusCode int,
+) {
+	cacheData := Cache{
+		Cachestatus: cacheStatus,
+		Reqtime:     reqtime,
 	}
-	return parsedWeather, nil
-} */
+	completeErrorMessage := ""
+	if onlyErrorMessage != nil {
+		completeErrorMessage = fmt.Sprintf("ERROR %d: %s", statusCode, onlyErrorMessage.Error())
+	}
+	displayData := DisplayData{
+		WeatherData:  data,
+		CacheData:    cacheData,
+		ErrorMessage: completeErrorMessage,
+	}
+
+	t, err := template.ParseFiles("./web/index.html")
+	if err != nil {
+		log.Println("ERR: While creating template for HTML file")
+		log.Println(err)
+		return
+	}
+
+	err = t.Execute(w, displayData)
+	if err != nil {
+		log.Println("ERR: While executing template")
+		log.Println(err)
+		return
+	}
+}

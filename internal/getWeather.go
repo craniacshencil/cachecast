@@ -15,6 +15,7 @@ import (
 func (c *CacheClient) GetWeather(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	var response JSONWrapper
+	var cacheStatus, elapsed string
 	start := time.Now()
 	ctx := context.Background()
 	location := r.FormValue("location")
@@ -29,11 +30,11 @@ func (c *CacheClient) GetWeather(w http.ResponseWriter, r *http.Request) {
 	// Form validation
 	err := validForm(location, onlyDate, onlyTime, startDate, endDate)
 	if err != nil {
-		utils.WriteJSON(w, http.StatusBadRequest, err.Error())
+		displayWeather(w, Weather{}, "", "", err, http.StatusBadRequest)
 		return
 	}
 
-	// Get API URL
+	// Get API URL and cacheKey
 	apiEndpoint := getApiURL(location, onlyDate, onlyTime, startDate, endDate)
 	cacheKey := getCacheKey(location, onlyDate, onlyTime, startDate, endDate)
 
@@ -42,31 +43,29 @@ func (c *CacheClient) GetWeather(w http.ResponseWriter, r *http.Request) {
 		log.Println(err.Error())
 		// Don't need to end flow because of cache failing
 	} else {
-		log.Printf("cache-hit: %s", time.Since(start))
-		utils.WriteJSON(w, http.StatusOK, &response.Data)
+		elapsed = time.Since(start).String()
+		cacheStatus = "cache-hit"
+		log.Printf("Exec: %s", elapsed)
+		displayWeather(w, response.Data, cacheStatus, elapsed, nil, http.StatusOK)
 		return
 	}
 
 	statusCode, err := fetchData(ctx, apiEndpoint, &response)
 	if err != nil {
-		utils.WriteJSON(w, statusCode, err.Error())
+		displayWeather(w, Weather{}, "", "", err, statusCode)
 		return
 	}
-
-	// Invalid location
-	if response.Data.ResolvedAddress == "" {
-		utils.WriteJSON(w, http.StatusBadRequest, "invalid location")
-		return
-	}
-
-	utils.WriteJSON(w, statusCode, &response.Data)
-	log.Printf("Exec: %s", time.Since(start))
 
 	go func() {
 		if err = c.storeInCache(ctx, cacheKey, &response); err != nil {
 			log.Println(err)
 		}
 	}()
+
+	elapsed = time.Since(start).String()
+	cacheStatus = "cache-miss"
+	log.Printf("Exec: %s", elapsed)
+	displayWeather(w, response.Data, cacheStatus, elapsed, nil, http.StatusOK)
 }
 
 func getApiURL(location, onlyDate, onlyTime, startDate, endDate string) (apiEndpoint string) {
@@ -141,11 +140,11 @@ func fetchData(
 	}
 
 	utils.ParseBody(res, &response.Data)
-	// parseData(&response.Data)
-	/* if response.Data == nil {
+	// Invalid location
+	if response.Data.ResolvedAddress == "" {
 		err = errors.Join(err, errors.New("invalid location, check for errors"))
 		return http.StatusNotFound, err
-	} */
+	}
 
 	return 200, nil
 }

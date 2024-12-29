@@ -43,6 +43,68 @@
     <br />
     <button>submit</button>
   </form>
+  {{ if .WeatherData.ResolvedAddress }}
+  <h2>Weather report</h2>
+  <h3>{{ .WeatherData.ResolvedAddress }}</h3>
+  <div class="cache-status">
+    <div>Cache status: {{.CacheData.Cachestatus}}</div>
+    <div>Latency: <strong>{{.CacheData.Reqtime}}</strong></div>
+  </div>
+
+  <div class="hour-day">
+    {{ if .WeatherData.CurrentConditions }}
+    <div class="hour">
+      <div>Conditions: {{ .WeatherData.CurrentConditions.Conditions }}</div>
+      <div>Temperature: {{ .WeatherData.CurrentConditions.Temp}}°C</div>
+      <div>Time: {{ .WeatherData.CurrentConditions.Datetime }}</div>
+    </div>
+    {{ end }}
+    <div class="days">
+      {{ range .WeatherData.Days}}
+      <div class="day">
+        <div>For the day: {{ .Datetime }}</div>
+        <div>Conditions: {{ .Conditions }}</div>
+        <div>Daily Temperature: {{ .Temp }} °C</div>
+        <div>Min<sup>m</sup> Temperature: {{ .Tempmin }}°C</div>
+        <div>Max<sup>m</sup> Temperature: {{ .Tempmax }}°C</div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ else }}
+  <div class="error-message">{{.ErrorMessage}}</div>
+  {{ end }}
 </body>
+
+<style>
+  .days,
+  .hour-day {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: start;
+    gap: 1rem;
+  }
+
+  .day,
+  .hour,
+  .cache-status,
+  .error-message {
+    border: 1px solid black;
+    padding: 0.5rem;
+    max-width: 20rem;
+  }
+
+  .cache-status {
+    margin-bottom: 2rem;
+  }
+
+  .error-message {
+    margin-top: 1rem;
+    background-color: red;
+    color: white;
+    max-width: 50rem;
+  }
+</style>
 
 </html>
