@@ -43,7 +43,7 @@
     <br />
     <button>submit</button>
   </form>
-  {{ if .WeatherData.ResolvedAddress }}
+  {{ if .}} {{ if .WeatherData.ResolvedAddress }}
   <h2>Weather report</h2>
   <h3>{{ .WeatherData.ResolvedAddress }}</h3>
   <div class="cache-status">
@@ -73,7 +73,7 @@
   </div>
   {{ else }}
   <div class="error-message">{{.ErrorMessage}}</div>
-  {{ end }}
+  {{ end }} {{ end }}
 </body>
 
 <style>
