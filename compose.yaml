@@ -1,0 +1,24 @@
+name: cachecast
+services:
+  app:
+    container_name: cachecast-golang-server
+    build: ./
+    restart: always
+    ports:
+      - 8080:8080
+    depends_on:
+      - redis
+    networks:
+      - cachecastnet
+
+  redis:
+    build: ./redis
+    container_name: cachecast-redis-server
+    restart: always
+    expose:
+      - 6379
+    networks:
+      - cachecastnet
+
+networks:
+  cachecastnet:

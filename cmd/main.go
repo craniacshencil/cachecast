@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -13,9 +14,24 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// Returns False if file does not exist
+func checkFileExists(name string) bool {
+	_, err := os.Stat(name)
+	return !errors.Is(err, os.ErrNotExist)
+}
+
 func init() {
-	if err := godotenv.Load(); err != nil {
-		log.Println("ERR: While opening .env file:", err)
+	// This works only if bash is installed in docker image
+	// APP_ENV := os.Getenv("APP_ENV")
+	log.Println(checkFileExists(".env"))
+	if checkFileExists(".env") {
+		if err := godotenv.Load(".env"); err != nil {
+			log.Println("ERR: While opening .env file:", err)
+			return
+		}
+	}
+	if err := godotenv.Load(".env.docker"); err != nil {
+		log.Println("ERR: While opening .env.docker file:", err)
 		return
 	}
 }
@@ -35,7 +51,7 @@ func main() {
 	router.Handle("POST /", rateLimiter(cacheClient.GetWeather))
 
 	server := &http.Server{
-		Addr:    os.Getenv("SERVER_ADDR"),
+		Addr:    ":8080",
 		Handler: router,
 	}
 
